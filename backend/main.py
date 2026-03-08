@@ -145,6 +145,7 @@ async def create_heritage(
             title=title,
             description=description,
             image_analyses=image_analysis,
+            uploaded_files=uploaded_files,
         )
     except Exception as e:
         print(f"[WARNING] Step-by-step guide generation failed: {e}")

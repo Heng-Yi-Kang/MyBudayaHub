@@ -191,6 +191,7 @@ export default function Home() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [audioFiles, setAudioFiles] = useState<File[]>([]);
   const [videoFiles, setVideoFiles] = useState<File[]>([]);
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<HeritageEntry[]>([]);
@@ -202,10 +203,11 @@ export default function Home() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
   const resultsSectionRef = useRef<HTMLDivElement>(null);
 
   // Combine all files for submission
-  const allFiles = useMemo(() => [...imageFiles, ...audioFiles, ...videoFiles], [imageFiles, audioFiles, videoFiles]);
+  const allFiles = useMemo(() => [...imageFiles, ...audioFiles, ...videoFiles, ...documentFiles], [imageFiles, audioFiles, videoFiles, documentFiles]);
 
   const showToast = useCallback((type: "success" | "error" | "info", message: string) => {
     setToast({ type, message });
@@ -240,18 +242,20 @@ export default function Home() {
   const handleDrop = (
     e: React.DragEvent,
     setter: React.Dispatch<React.SetStateAction<File[]>>,
-    acceptPrefix: string
+    acceptPrefixes: string | string[]
   ) => {
     e.preventDefault();
     setDragOverZone(null);
     if (e.dataTransfer.files) {
+      const prefixes = Array.isArray(acceptPrefixes) ? acceptPrefixes : [acceptPrefixes];
       const validFiles = Array.from(e.dataTransfer.files).filter((f) =>
-        f.type.startsWith(acceptPrefix)
+        prefixes.some((p) => f.type.startsWith(p))
       );
       if (validFiles.length > 0) {
         setter((prev) => [...prev, ...validFiles]);
       } else {
-        showToast("error", `Please drop ${acceptPrefix.replace("/", "")} files only.`);
+        const labels = prefixes.map(p => p.replace("/", ""));
+        showToast("error", `Please drop ${labels.join(" or ")} files only.`);
       }
     }
   };
@@ -289,6 +293,7 @@ export default function Home() {
       setImageFiles([]);
       setAudioFiles([]);
       setVideoFiles([]);
+      setDocumentFiles([]);
 
       if (data.image_analysis.length > 0) {
         showToast("info", "AI has analysed your images! Review the description below and approve to generate artwork.");
@@ -609,6 +614,56 @@ export default function Home() {
                       ))}
                     </div>
                   )}
+                  {/* ── Document Upload ── */}
+                  <div>
+                    <div
+                      className={`drop-zone ${dragOverZone === "document" ? "drag-over" : ""}`}
+                      onDragOver={(e) => handleDragOver(e, "document")}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, setDocumentFiles, ["application/", "text/"])}
+                      onClick={() => documentInputRef.current?.click()}
+                      role="button"
+                      tabIndex={0}
+                      id="document-drop-zone"
+                      style={{ padding: "18px 20px", minHeight: "auto" }}
+                    >
+                      <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "14px" }}>
+                        <div style={{ color: "rgba(245, 158, 11, 0.6)", flexShrink: 0 }}>
+                          <IconFile />
+                        </div>
+                        <div>
+                          <p style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "2px", fontWeight: 500 }}>
+                            Documents <span style={{ fontWeight: 400, fontSize: "12px", color: "var(--text-muted)" }}>— optional</span>
+                          </p>
+                          <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>
+                            Drop or click to add .docs, .txt, .xlsx files
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <input
+                      ref={documentInputRef}
+                      type="file"
+                      multiple
+                      accept=".doc,.docx,.txt,.xls,.xlsx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      onChange={(e) => handleMediaFileChange(e, setDocumentFiles)}
+                      style={{ display: "none" }}
+                      id="document-input"
+                    />
+                    {documentFiles.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "10px" }}>
+                        {documentFiles.map((file, i) => (
+                          <div key={`doc-${file.name}-${i}`} className="file-chip">
+                            <IconFile />
+                            <span>{file.name}</span>
+                            <span style={{ color: "var(--text-muted)" }}>({formatFileSize(file.size)})</span>
+                            <button type="button" className="remove-btn" onClick={(e) => { e.stopPropagation(); removeMediaFile(i, setDocumentFiles); }} aria-label={`Remove ${file.name}`}><IconX /></button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                 </div>
 
               </div>
@@ -645,7 +700,7 @@ export default function Home() {
       </div>
 
         {/* Right Column: Output / Dashboard */}
-        <div style={{ padding: "32px", overflowY: "auto", position: "relative", background: "rgba(15, 23, 42, 0.4)" }}>
+        <div style={{ padding: "32px", overflowY: "auto", position: "relative", background: "rgba(248, 250, 252, 0.4)" }}>
         {submissions.length > 0 && (
           <div ref={resultsSectionRef}>
             <h2
@@ -700,32 +755,32 @@ export default function Home() {
                           alignItems: "center",
                           gap: "8px",
                           padding: "10px 18px",
-                          background: "rgba(15, 23, 42, 0.75)",
+                          background: "rgba(248, 250, 252, 0.75)",
                           backdropFilter: "blur(12px)",
                           WebkitBackdropFilter: "blur(12px)",
-                          border: "1px solid rgba(34, 197, 94, 0.3)",
+                          border: "1px solid rgba(22, 163, 74, 0.3)",
                           borderRadius: "12px",
-                          color: "rgba(34, 197, 94, 0.9)",
+                          color: "rgba(22, 163, 74, 0.9)",
                           cursor: "pointer",
                           fontSize: "13px",
                           fontWeight: 600,
                           fontFamily: "var(--font-serif), monospace",
                           letterSpacing: "0.04em",
                           transition: "all 0.25s ease",
-                          boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
+                          boxShadow: "0 4px 16px rgba(0, 0, 0, 0.1)",
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "rgba(34, 197, 94, 0.2)";
-                          e.currentTarget.style.borderColor = "rgba(34, 197, 94, 0.6)";
-                          e.currentTarget.style.color = "rgba(34, 197, 94, 1)";
-                          e.currentTarget.style.boxShadow = "0 4px 24px rgba(34, 197, 94, 0.2)";
+                          e.currentTarget.style.background = "rgba(22, 163, 74, 0.1)";
+                          e.currentTarget.style.borderColor = "rgba(22, 163, 74, 0.6)";
+                          e.currentTarget.style.color = "rgba(22, 163, 74, 1)";
+                          e.currentTarget.style.boxShadow = "0 4px 24px rgba(22, 163, 74, 0.2)";
                           e.currentTarget.style.transform = "translateY(-2px)";
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "rgba(15, 23, 42, 0.75)";
-                          e.currentTarget.style.borderColor = "rgba(34, 197, 94, 0.3)";
-                          e.currentTarget.style.color = "rgba(34, 197, 94, 0.9)";
-                          e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.3)";
+                          e.currentTarget.style.background = "rgba(248, 250, 252, 0.75)";
+                          e.currentTarget.style.borderColor = "rgba(22, 163, 74, 0.3)";
+                          e.currentTarget.style.color = "rgba(22, 163, 74, 0.9)";
+                          e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.1)";
                           e.currentTarget.style.transform = "translateY(0)";
                         }}
                       >

@@ -113,6 +113,7 @@ async def summarize_heritage_input(
     title: str,
     description: str,
     image_analyses: list[dict],
+    uploaded_files: list[dict] = None,
 ) -> str:
     """
     Use Gemini 3.1 Flash Lite to produce a step-by-step guide based on the
@@ -139,12 +140,43 @@ async def summarize_heritage_input(
         if analysis_texts else ""
     )
 
+    # Gather info from uploaded documents
+    document_info = []
+    if uploaded_files:
+        for uf in uploaded_files:
+            ctype = uf.get("content_type", "")
+            orig_name = uf.get("original_name", "")
+            
+            # Simple text reading for .txt files
+            if ctype == "text/plain" or orig_name.lower().endswith(".txt"):
+                from config import UPLOAD_DIR
+                import os
+                # Extract heritage_id from URL /uploads/{heritage_id}/{safe_name}
+                parts = uf["url"].split("/")
+                if len(parts) >= 3:
+                    heritage_id = parts[2]
+                    file_path = os.path.join(UPLOAD_DIR, heritage_id, uf["saved_name"])
+                    try:
+                        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                            content = f.read(2000) # Read first 2000 chars
+                            document_info.append(f"Document '{orig_name}' content snippet:\n{content}")
+                    except Exception as e:
+                        print(f"[WARNING] Could not read text file {orig_name}: {e}")
+            elif not ctype.startswith("image/") and not ctype.startswith("audio/") and not ctype.startswith("video/"):
+                document_info.append(f"Additional document provided: '{orig_name}'")
+
+    document_block = (
+        "\n\nAdditional Document Information:\n" + "\n".join(document_info)
+        if document_info else ""
+    )
+
     prompt = (
         "You are a cultural heritage documentation assistant.\n"
         "The user submitted the following heritage entry:\n\n"
         f"Title: {title}\n"
         f"Description: {description}"
-        f"{analysis_block}\n\n"
+        f"{analysis_block}"
+        f"{document_block}\n\n"
         "Based on the information above, produce a clear, numbered "
         "step-by-step guide (5–8 steps) that explains how to perform, "
         "recreate, or experience this cultural heritage practice.\n\n"
